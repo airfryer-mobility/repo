@@ -1,0 +1,35 @@
+name: Deploy APT Repo
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout the code AND download the actual LFS files
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true # Crucial: tells the runner to download the real .deb files
+
+      # 2. Strip LFS track configurations so GitHub Pages treats them as raw files
+      - name: Convert LFS pointers to real files
+        run: |
+          git lfs uninstall
+          rm -rf .gitattributes
+          rm -rf .git
+
+      # 3. Push raw files to the gh-pages branch
+      - name: Deploy to GitHub Pages Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
