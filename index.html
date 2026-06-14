@@ -1,1 +1,250 @@
-<h1 style="font-family: sans-serif">This is an APT repository</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Packages.gz Parser</title>
+        <style>
+            @font-face {
+                font-family: "LXGW WenKai Mono TC";
+                src: url("https://airfryer-mobility.github.io/dragonfly/Font.ttf");
+            }
+
+            body {
+                font-family: "LXGW WenKai Mono TC", sans-serif;
+                margin: 20px;
+                background-color: black;
+                color: #e0e0e0;
+            }
+            h1 {
+                color: #ffffff;
+            }
+            .controls {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            button {
+                padding: 10px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                background-color: red;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            button:hover {
+                background-color: red;
+            }
+            button:disabled {
+                background-color: #333333;
+                color: #777777;
+                cursor: not-allowed;
+            }
+            input[type="text"] {
+                padding: 9px;
+                font-size: 14px;
+                width: 250px;
+                background-color: #1e1e1e;
+                border: 1px solid #333333;
+                border-radius: 5px;
+                color: #ffffff;
+            }
+            input[type="text"]:focus {
+                outline: none;
+                border-color: red;
+            }
+            input[type="text"]:disabled {
+                background-color: #161616;
+                color: #555555;
+            }
+            #status {
+                font-weight: bold;
+                color: #aaaaaa;
+            }
+            #packageList {
+                display: grid;
+                gap: 15px;
+            }
+            .card {
+                background: #1e1e1e;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+                border: 1px solid #2d2d2d;
+            }
+            .pkg-name {
+                font-size: 18px;
+                font-weight: bold;
+                color: red;
+                margin: 0 0 5px 0;
+            }
+            .pkg-meta {
+                font-size: 12px;
+                color: #aaaaaa;
+                margin-bottom: 10px;
+            }
+            .pkg-desc {
+                font-size: 14px;
+                white-space: pre-wrap;
+                line-height: 1.4;
+                color: #cccccc;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Packages.gz Parser</h1>
+
+        <div class="controls">
+            <button id="loadBtn">Load & Parse Packages.gz</button>
+            <input
+                type="text"
+                id="searchBar"
+                placeholder="Filter by package name..."
+                disabled
+            />
+            <span id="status">Click load to start.</span>
+        </div>
+
+        <div id="packageList"></div>
+
+        <script>
+            const loadBtn = document.getElementById("loadBtn");
+            const searchBar = document.getElementById("searchBar");
+            const status = document.getElementById("status");
+            const packageList = document.getElementById("packageList");
+
+            let allPackages = [];
+
+            loadBtn.addEventListener("click", async () => {
+                try {
+                    loadBtn.disabled = true;
+                    status.textContent = "Fetching Packages.gz...";
+
+                    // 1. Fetch the file adjacent to this HTML file
+                    const response = await fetch("./Packages.gz");
+                    if (!response.ok) {
+                        throw new Error(
+                            `Could not find Packages.gz next to this file (HTTP ${response.status})`,
+                        );
+                    }
+
+                    status.textContent = "Decompressing gzip archive...";
+                    // 2. Decompress using browser native DecompressionStream
+                    const gzipStream = response.body.pipeThrough(
+                        new DecompressionStream("gzip"),
+                    );
+                    const textResponse = new Response(gzipStream);
+                    const rawText = await textResponse.text();
+
+                    status.textContent = "Parsing control schema fields...";
+                    // 3. Parse text contents into objects
+                    allPackages = parseControlText(rawText);
+
+                    status.textContent = `Successfully loaded ${allPackages.length} packages.`;
+                    searchBar.disabled = false;
+
+                    // Display initial output
+                    renderPackages(allPackages);
+                } catch (error) {
+                    status.textContent = `Error: ${error.message}`;
+                    console.error(error);
+                } finally {
+                    loadBtn.disabled = false;
+                }
+            });
+
+            // Search filtering logic
+            searchBar.addEventListener("input", (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allPackages.filter(
+                    (pkg) =>
+                        pkg.Package &&
+                        pkg.Package.toLowerCase().includes(query),
+                );
+                renderPackages(filtered);
+            });
+
+            // RFC 822 / Debian Control format text engine
+            function parseControlText(text) {
+                const packages = [];
+                const entries = text.split(/\n\s*\n/);
+
+                for (const entry of entries) {
+                    if (!entry.trim()) continue;
+
+                    const pkg = {};
+                    const lines = entry.split("\n");
+                    let currentKey = "";
+
+                    for (const line of lines) {
+                        if (line.startsWith(" ") || line.startsWith("\t")) {
+                            if (currentKey) {
+                                pkg[currentKey] += "\n" + line.slice(1);
+                            }
+                        } else {
+                            const colonIndex = line.indexOf(":");
+                            if (colonIndex !== -1) {
+                                currentKey = line.slice(0, colonIndex).trim();
+                                const value = line.slice(colonIndex + 1).trim();
+                                pkg[currentKey] = value;
+                            }
+                        }
+                    }
+                    packages.push(pkg);
+                }
+                return packages;
+            }
+
+            // DOM Rendering UI logic
+            function renderPackages(packagesList) {
+                packageList.innerHTML = "";
+
+                // Limit rendering to the first 200 packages so the browser window stays responsive
+                const limit = 200;
+                const itemsToRender = packagesList.slice(0, limit);
+
+                if (itemsToRender.length === 0) {
+                    packageList.innerHTML =
+                        '<div class="card">No packages matched your search.</div>';
+                    return;
+                }
+
+                itemsToRender.forEach((pkg) => {
+                    const card = document.createElement("div");
+                    card.className = "card";
+
+                    const name = document.createElement("div");
+                    name.className = "pkg-name";
+                    name.textContent = pkg.Package || "Unknown Package";
+
+                    const meta = document.createElement("div");
+                    meta.className = "pkg-meta";
+                    meta.textContent = `Version: ${pkg.Version || "N/A"} | Section: ${pkg.Section || "N/A"} | Size: ${pkg.Size || "N/A"} bytes`;
+
+                    const desc = document.createElement("div");
+                    desc.className = "pkg-desc";
+                    desc.textContent =
+                        pkg.Description || "No description provided.";
+
+                    card.appendChild(name);
+                    card.appendChild(meta);
+                    card.appendChild(desc);
+                    packageList.appendChild(card);
+                });
+
+                if (packagesList.length > limit) {
+                    const notice = document.createElement("div");
+                    notice.style.padding = "10px";
+                    notice.style.textAlign = "center";
+                    notice.style.color = "#777777";
+                    notice.textContent = `Showing first ${limit} of ${packagesList.length} packages. Use the search filter to narrow it down.`;
+                    packageList.appendChild(notice);
+                }
+            }
+        </script>
+    </body>
+</html>
