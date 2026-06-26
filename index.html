@@ -3,21 +3,30 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Packages.gz Parser</title>
+        <title>dragonfly repo</title>
+        <link
+            rel="icon"
+            type="image/png"
+            href="https://airfryer-mobility.github.io/dragonfly/dfly.png"
+        />
         <style>
             @font-face {
                 font-family: "LXGW WenKai Mono TC";
                 src: url("https://airfryer-mobility.github.io/dragonfly/Font.ttf");
             }
 
-            body {
+            * {
                 font-family: "LXGW WenKai Mono TC", sans-serif;
+            }
+            body {
                 margin: 20px;
                 background-color: black;
                 color: #e0e0e0;
             }
             h1 {
                 color: #ffffff;
+                display: flex;
+                align-items: center;
             }
             .controls {
                 margin-bottom: 20px;
@@ -96,10 +105,20 @@
         </style>
     </head>
     <body>
-        <h1>Packages.gz Parser</h1>
+        <h1
+            onclick="
+                window.location.href = `https://airfryer-mobility.github.io/dragonfly`
+            "
+        >
+            <img
+                height="50"
+                src="https://airfryer-mobility.github.io/dragonfly/dfly.png"
+            />
+            &ensp;Package list
+        </h1>
 
         <div class="controls">
-            <button id="loadBtn">Load & Parse Packages.gz</button>
+            <button id="loadBtn">Reload Packages</button>
             <input
                 type="text"
                 id="searchBar"
@@ -119,7 +138,7 @@
 
             let allPackages = [];
 
-            loadBtn.addEventListener("click", async () => {
+            async function load() {
                 try {
                     loadBtn.disabled = true;
                     status.textContent = "Fetching Packages.gz...";
@@ -155,6 +174,9 @@
                 } finally {
                     loadBtn.disabled = false;
                 }
+            }
+            loadBtn.addEventListener("click", async () => {
+                load();
             });
 
             // Search filtering logic
@@ -245,6 +267,7 @@
                     packageList.appendChild(notice);
                 }
             }
+            load();
         </script>
     </body>
 </html>
