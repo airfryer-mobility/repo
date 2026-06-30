@@ -139,6 +139,9 @@
             let allPackages = [];
 
             async function load() {
+                if (window.location.protocol == "file:") {
+                    alert("You are supposed to use an http server");
+                }
                 try {
                     loadBtn.disabled = true;
                     status.textContent = "Fetching Packages.gz...";
